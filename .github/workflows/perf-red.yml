@@ -1,4 +1,4 @@
-name: Performance regression RED
+name: Performance regression
 
 on:
   workflow_dispatch:
@@ -39,13 +39,14 @@ jobs:
           s = p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
           p.write_text(s)
           PY
-      - name: Apply current runtime fixes
+      - name: Apply current fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           tar -xzf safety-overlay.tar.gz -C project
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
+          python3 patches/fix-performance-resume.py
       - name: Add cadence regression test
         shell: bash
         run: |
@@ -64,6 +65,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-      - name: Run RED cadence test
+      - name: Run cadence regression test
         working-directory: project
         run: gradle :vision:testDebugUnitTest --tests dev.pylarl.vision.PerformanceCadenceRegressionTest --stacktrace --no-daemon
