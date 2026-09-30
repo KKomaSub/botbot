@@ -22,5 +22,14 @@ jobs:
           tar -xzf pyla-project.tar.gz -C project
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           tar -xzf safety-overlay.tar.gz -C project
+          python3 patches/fix-startup-readiness.py
           echo '===== BotRuntimeCoordinator.kt ====='
-          nl -ba project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt | sed -n '1,320p'
+          nl -ba project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt | sed -n '1,360p'
+          echo '===== OnnxInferenceEngine.kt ====='
+          nl -ba project/vision/src/main/kotlin/dev/pylarl/vision/OnnxInferenceEngine.kt | sed -n '1,360p'
+          echo '===== TensorPreprocessor.kt ====='
+          nl -ba project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt | sed -n '1,320p'
+          echo '===== MediaProjectionFrameSource.kt ====='
+          nl -ba project/capture/src/main/java/dev/pylarl/capture/MediaProjectionFrameSource.kt | sed -n '1,360p'
+          echo '===== PylaAccessibilityService.kt ====='
+          nl -ba project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt | sed -n '1,360p'
