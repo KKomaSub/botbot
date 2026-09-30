@@ -47,14 +47,14 @@ jobs:
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
           python3 patches/fix-performance-resume.py
-      - name: Add transient foreground regression test
+      - name: Add persistent foreground mismatch regression test
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('project/runtime/src/test/kotlin/dev/pylarl/runtime/SafetyRegressionTest.kt')
           s=p.read_text()
-          test='''\n    @Test fun brief_foreground_noise_does_not_pause_running() = runBlocking {\n        val input = Input()\n        val coordinator = coordinator(input = input)\n        coordinator.start(BotConfig(), ProjectionGrant(0, null))\n        awaitPhase(coordinator, RuntimePhase.RUNNING)\n        input.foregroundPackage.value = "com.android.systemui"\n        delay(100)\n        input.foregroundPackage.value = PlatformContract.BRAWL_STARS_PACKAGE\n        delay(700)\n        assertEquals(RuntimePhase.RUNNING, coordinator.snapshot.value.phase)\n        coordinator.stop()\n    }\n'''
+          test='''\n    @Test fun persistent_foreground_mismatch_does_not_pause_runtime() = runBlocking {\n        val input = Input()\n        val coordinator = coordinator(input = input)\n        coordinator.start(BotConfig(), ProjectionGrant(0, null))\n        awaitPhase(coordinator, RuntimePhase.RUNNING)\n        input.foregroundPackage.value = "com.android.systemui"\n        delay(800)\n        assertEquals(RuntimePhase.RUNNING, coordinator.snapshot.value.phase)\n        coordinator.stop()\n    }\n'''
           idx=s.rfind('\n}')
           if idx < 0: raise SystemExit('class closing brace not found')
           p.write_text(s[:idx]+test+s[idx:])
@@ -72,6 +72,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-      - name: Run resume stability regression test
+      - name: Run persistent foreground regression test
         working-directory: project
-        run: gradle :runtime:testDebugUnitTest --tests 'dev.pylarl.runtime.SafetyRegressionTest.brief_foreground_noise_does_not_pause_running' --stacktrace --no-daemon
+        run: gradle :runtime:testDebugUnitTest --tests 'dev.pylarl.runtime.SafetyRegressionTest.persistent_foreground_mismatch_does_not_pause_runtime' --stacktrace --no-daemon
