@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v3
+name: Build Pyla Android APK v4 performance-resume
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Apply runtime fixes
+      - name: Apply runtime performance and resume fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
@@ -49,9 +49,11 @@ jobs:
           tar -xzf safety-overlay.tar.gz -C project
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
-          grep -q 'RuntimePhase.CAPTURING' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
-          grep -q 'PERFORMANCE_DEGRADED' project/runtime/src/main/kotlin/dev/pylarl/runtime/RuntimeError.kt
-          grep -q 'forceStopPackageBestEffort' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          python3 patches/fix-performance-resume.py
+          grep -q 'PerformancePreset.BALANCED -> 4L' project/vision/src/main/kotlin/dev/pylarl/vision/OnnxInferenceEngine.kt
+          grep -q 'delay(350L)' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
+          grep -q 'TYPE_WINDOW_STATE_CHANGED' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          grep -q 'row.position(rowStart)' project/capture/src/main/java/dev/pylarl/capture/MediaProjectionFrameSource.kt
 
       - uses: actions/setup-java@v5
         with:
@@ -69,9 +71,10 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Run runtime regression tests
+      - name: Run regression tests
         working-directory: project
-        run: gradle :runtime:testDebugUnitTest --stacktrace --no-daemon
+        run: |
+          gradle :vision:testDebugUnitTest :runtime:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         working-directory: project
@@ -81,7 +84,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-startup-fixed-apk
+          name: pyla-rl-android-performance-resume-fixed-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
