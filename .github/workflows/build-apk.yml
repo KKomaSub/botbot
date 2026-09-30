@@ -27,6 +27,8 @@ jobs:
           tar -xzf /tmp/pyla-project.tar.gz -C .
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
+          find . -name build.gradle.kts -type f -print0 | xargs -0 sed -i 's/compileSdk = 37/compileSdk = 36/g'
+          grep -R 'compileSdk = ' -n app bot-core capture input runtime state vision
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -34,13 +36,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK 37
+      - name: Install Android SDK 36
         shell: bash
         run: |
           SDKMANAGER="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platforms;android-37' 'build-tools;36.0.0' 'platform-tools'
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
 
       - name: Set up Gradle 9.6.0
         uses: gradle/actions/setup-gradle@v4
