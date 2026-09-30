@@ -84,6 +84,7 @@ p.write_text(s.replace(old, new, 1))
 
 # Keep the unit test aligned with the source model's actual BGR input convention and letterbox behavior.
 p = Path('project/vision/src/test/kotlin/dev/pylarl/vision/TensorPreprocessorTest.kt')
+p.parent.mkdir(parents=True, exist_ok=True)
 p.write_text(r'''package dev.pylarl.vision
 
 import dev.pylarl.capture.CapturedFrame
