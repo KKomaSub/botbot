@@ -1,4 +1,4 @@
-name: Startup readiness regression (RED)
+name: Startup readiness regression
 
 on:
   workflow_dispatch:
@@ -41,12 +41,13 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Apply current safety patch
+      - name: Apply runtime fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           tar -xzf safety-overlay.tar.gz -C project
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          python3 patches/fix-startup-readiness.py
 
       - name: Add startup regression test
         shell: bash
