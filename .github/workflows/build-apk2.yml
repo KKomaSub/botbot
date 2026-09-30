@@ -25,6 +25,9 @@ jobs:
           test -f project/settings.gradle.kts
           test -f project/app/build.gradle.kts
           find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
+          sed -i 's/composeBom = "2026.09.00"/composeBom = "2025.08.00"/' project/gradle/libs.versions.toml
+          sed -i 's/activity = "1.13.0"/activity = "1.11.0"/' project/gradle/libs.versions.toml
+          sed -i 's/lifecycle = "2.11.0"/lifecycle = "2.9.4"/' project/gradle/libs.versions.toml
           find project -name build.gradle.kts -exec sed -i '1i @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")' {} +
           for f in project/state/build.gradle.kts project/vision/build.gradle.kts; do
             sed -i '2i import java.net.URI' "$f"
@@ -45,6 +48,9 @@ jobs:
           s = s.replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
           p.write_text(s)
           PY
+          grep -q 'composeBom = "2025.08.00"' project/gradle/libs.versions.toml
+          grep -q 'activity = "1.11.0"' project/gradle/libs.versions.toml
+          grep -q 'lifecycle = "2.9.4"' project/gradle/libs.versions.toml
           ! grep -R "compileSdk = 37" project --include='build.gradle.kts'
           ! grep -R "android.sourceSets" project --include='build.gradle.kts'
 
