@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore and list runtime test/contracts
+      - name: Restore and inspect runtime tests
         shell: bash
         run: |
           cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
@@ -21,14 +21,5 @@ jobs:
           tar -xzf safety-overlay.tar.gz -C project
           python3 patches/fix-startup-readiness.py
           python3 patches/fix-performance-resume.py
-          echo '===== runtime files ====='
-          find project/runtime -type f | sort
-          echo '===== FrameSource ====='
-          cat project/capture/src/main/kotlin/dev/pylarl/capture/FrameSource.kt 2>/dev/null || cat project/capture/src/main/java/dev/pylarl/capture/FrameSource.kt 2>/dev/null || true
-          echo '===== InputController ====='
-          find project/input/src/main -name 'InputController.kt' -print -exec cat {} \;
-          echo '===== InferenceEngine ====='
-          find project/vision/src/main -name 'InferenceEngine.kt' -print -exec cat {} \;
-          echo '===== DisplayGeometry ====='
-          grep -R "data class DisplayGeometry\|class DisplayGeometry" -n project/bot-core/src/main || true
-          grep -R -A8 -B2 "data class DisplayGeometry\|class DisplayGeometry" project/bot-core/src/main || true
+          echo '===== SafetyRegressionTest.kt ====='
+          nl -ba project/runtime/src/test/kotlin/dev/pylarl/runtime/SafetyRegressionTest.kt | sed -n '1,420p'
