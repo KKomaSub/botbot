@@ -31,6 +31,10 @@ jobs:
           sed -i 's/agp = "9.4.0"/agp = "8.13.2"/' gradle/libs.versions.toml
           sed -i 's/kotlin = "2.4.20"/kotlin = "2.2.21"/' gradle/libs.versions.toml
           sed -i '/android.builtInKotlin=false/d;/android.newDsl=false/d' gradle.properties
+          for f in state/build.gradle.kts vision/build.gradle.kts; do
+            sed -i '1i import java.net.URI' "$f"
+            sed -i 's/java\.net\.URI(/URI(/g' "$f"
+          done
           grep -E '^(agp|kotlin) =' gradle/libs.versions.toml
           grep -R 'compileSdk = ' -n app bot-core capture input runtime state vision
 
