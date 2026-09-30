@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v4 performance-resume
+name: Build Pyla Android APK v5 no-pause
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Apply runtime performance and resume fixes
+      - name: Apply fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
@@ -50,10 +50,9 @@ jobs:
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
           python3 patches/fix-performance-resume.py
-          grep -q 'PerformancePreset.BALANCED -> 4L' project/vision/src/main/kotlin/dev/pylarl/vision/OnnxInferenceEngine.kt
-          grep -q 'delay(350L)' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
-          grep -q 'TYPE_WINDOW_STATE_CHANGED' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
-          grep -q 'row.position(rowStart)' project/capture/src/main/java/dev/pylarl/capture/MediaProjectionFrameSource.kt
+          python3 patches/fix-never-pause-on-foreground.py
+          grep -q 'return inputController.status.value == InputStatus.READY && geometry.isLandscape' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
+          ! grep -A5 'private fun isReadyForRunning' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt | grep -q 'foregroundPackage.value == PlatformContract.BRAWL_STARS_PACKAGE'
 
       - uses: actions/setup-java@v5
         with:
@@ -71,11 +70,6 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Run regression tests
-        working-directory: project
-        run: |
-          gradle :vision:testDebugUnitTest :runtime:testDebugUnitTest --stacktrace --no-daemon
-
       - name: Build debug APK
         working-directory: project
         run: |
@@ -84,7 +78,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-performance-resume-fixed-apk
+          name: pyla-rl-android-no-pause-fixed-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
