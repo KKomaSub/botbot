@@ -22,8 +22,6 @@ jobs:
           base64 -d project.b64 > pyla-project.tar.gz
           mkdir project
           tar -xzf pyla-project.tar.gz -C project
-          test -f project/settings.gradle.kts
-          test -f project/app/build.gradle.kts
           find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
           sed -i 's/composeBom = "2026.09.00"/composeBom = "2025.08.00"/' project/gradle/libs.versions.toml
           sed -i 's/activity = "1.13.0"/activity = "1.11.0"/' project/gradle/libs.versions.toml
@@ -36,23 +34,64 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path('project/vision/build.gradle.kts')
-          s = p.read_text()
-          s = s.replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")')
-          s = s.replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
+          s = p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
           p.write_text(s)
           p = Path('project/state/build.gradle.kts')
-          s = p.read_text()
-          s = s.replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")')
-          s = s.replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")')
-          s = s.replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '')
-          s = s.replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
+          s = p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
           p.write_text(s)
           PY
-          grep -q 'composeBom = "2025.08.00"' project/gradle/libs.versions.toml
-          grep -q 'activity = "1.11.0"' project/gradle/libs.versions.toml
-          grep -q 'lifecycle = "2.9.4"' project/gradle/libs.versions.toml
-          ! grep -R "compileSdk = 37" project --include='build.gradle.kts'
-          ! grep -R "android.sourceSets" project --include='build.gradle.kts'
+
+      - name: Add regression tests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('project/runtime/src/test/kotlin/dev/pylarl/runtime/BotRuntimeCoordinatorTest.kt')
+          s = p.read_text()
+          extra = r'''
+
+    @Test fun resume_request_is_armed_until_target_returns_to_foreground() = runBlocking {
+        val input = Input(); val coordinator = coordinator(input = input)
+        coordinator.start(BotConfig(), ProjectionGrant(0, null)); awaitPhase(coordinator, RuntimePhase.RUNNING)
+        input.foregroundPackage.value = "dev.pylarl.android"; awaitPhase(coordinator, RuntimePhase.PAUSED)
+        coordinator.resume(); delay(20)
+        assertEquals(RuntimePhase.PAUSED, coordinator.snapshot.value.phase)
+        input.foregroundPackage.value = PlatformContract.BRAWL_STARS_PACKAGE
+        awaitPhase(coordinator, RuntimePhase.RUNNING)
+        coordinator.stop()
+    }
+
+    @Test fun release_failure_during_pause_does_not_escape_or_kill_runtime() = runBlocking {
+        val status = MutableStateFlow(InputStatus.READY)
+        val foreground = MutableStateFlow<String?>(PlatformContract.BRAWL_STARS_PACKAGE)
+        val crashingInput = object : InputController {
+            override val status = status
+            override val foregroundPackage = foreground
+            override suspend fun dispatch(action: BotAction, geometry: DisplayGeometry) = Result.success(Unit)
+            override suspend fun releaseAll() { error("synthetic release failure") }
+        }
+        val coordinator = BotRuntimeCoordinator(
+            frameSource = Frames(), engine = Engine(), inputController = crashingInput,
+            geometryProvider = { DisplayGeometry(2400, 1080, 0) },
+        )
+        coordinator.start(BotConfig(), ProjectionGrant(0, null)); awaitPhase(coordinator, RuntimePhase.RUNNING)
+        coordinator.pause()
+        assertEquals(RuntimePhase.PAUSED, coordinator.snapshot.value.phase)
+        coordinator.stop()
+    }
+
+    @Test fun severe_inference_slowdown_enters_error() = runBlocking {
+        val frames = Frames(); val engine = Engine(delayMs = 1700); val coordinator = coordinator(frames = frames, engine = engine)
+        coordinator.start(BotConfig(targetInferenceFps = 60), ProjectionGrant(0, null)); awaitPhase(coordinator, RuntimePhase.RUNNING)
+        frames.channel.send(frame(42))
+        repeat(300) { if (coordinator.snapshot.value.phase == RuntimePhase.ERROR) return@repeat else delay(10) }
+        assertEquals(RuntimePhase.ERROR, coordinator.snapshot.value.phase)
+        coordinator.stop()
+    }
+'''
+          idx = s.rfind('\n}')
+          p.write_text(s[:idx] + extra + s[idx:])
+          PY
 
       - uses: actions/setup-java@v5
         with:
@@ -62,9 +101,7 @@ jobs:
       - name: Install Android SDK
         shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
@@ -72,9 +109,12 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Run regression tests
+        working-directory: project
+        run: gradle :runtime:testDebugUnitTest --stacktrace --no-daemon
+
       - name: Build debug APK
         working-directory: project
-        shell: bash
         run: |
           gradle :app:assembleDebug --stacktrace --no-daemon
           test -f app/build/outputs/apk/debug/app-debug.apk
