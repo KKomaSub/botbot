@@ -1,0 +1,75 @@
+name: Startup readiness regression (RED)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "build/apk2" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
+          base64 -d project.b64 > pyla-project.tar.gz
+          mkdir project
+          tar -xzf pyla-project.tar.gz -C project
+          find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
+          sed -i 's/composeBom = "2026.09.00"/composeBom = "2025.08.00"/' project/gradle/libs.versions.toml
+          sed -i 's/activity = "1.13.0"/activity = "1.11.0"/' project/gradle/libs.versions.toml
+          sed -i 's/lifecycle = "2.11.0"/lifecycle = "2.9.4"/' project/gradle/libs.versions.toml
+          find project -name build.gradle.kts -exec sed -i '1i @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")' {} +
+          for f in project/state/build.gradle.kts project/vision/build.gradle.kts; do
+            sed -i '2i import java.net.URI' "$f"
+            sed -i 's/java\.net\.URI(/URI(/g' "$f"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('project/vision/build.gradle.kts')
+          s = p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
+          p.write_text(s)
+          p = Path('project/state/build.gradle.kts')
+          s = p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
+          p.write_text(s)
+          PY
+
+      - name: Apply current safety patch
+        shell: bash
+        run: |
+          base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
+          tar -xzf safety-overlay.tar.gz -C project
+          sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+
+      - name: Add startup regression test
+        shell: bash
+        run: |
+          mkdir -p project/runtime/src/test/kotlin/dev/pylarl/runtime
+          echo 'cGFja2FnZSBkZXYucHlsYXJsLnJ1bnRpbWUKCmltcG9ydCBkZXYucHlsYXJsLmJvdGNvcmUuUGxhdGZvcm1Db250cmFjdAppbXBvcnQgZGV2LnB5bGFybC5ib3Rjb3JlLmFjdGlvbi5Cb3RBY3Rpb24KaW1wb3J0IGRldi5weWxhcmwuYm90Y29yZS5jb25maWcuQm90Q29uZmlnCmltcG9ydCBkZXYucHlsYXJsLmJvdGNvcmUubW9kZWwuRGlzcGxheUdlb21ldHJ5CmltcG9ydCBkZXYucHlsYXJsLmJvdGNvcmUubW9kZWwuSW5wdXRTdGF0dXMKaW1wb3J0IGRldi5weWxhcmwuY2FwdHVyZS5DYXB0dXJlZEZyYW1lCmltcG9ydCBkZXYucHlsYXJsLmNhcHR1cmUuRnJhbWVTb3VyY2UKaW1wb3J0IGRldi5weWxhcmwuY2FwdHVyZS5Qcm9qZWN0aW9uR3JhbnQKaW1wb3J0IGRldi5weWxhcmwuaW5wdXQuSW5wdXRDb250cm9sbGVyCmltcG9ydCBkZXYucHlsYXJsLnZpc2lvbi5JbmZlcmVuY2VFbmdpbmUKaW1wb3J0IGRldi5weWxhcmwudmlzaW9uLkluZmVyZW5jZVByb3ZpZGVyCmltcG9ydCBkZXYucHlsYXJsLnZpc2lvbi5WaXNpb25GcmFtZVJlc3VsdAppbXBvcnQga290bGlueC5jb3JvdXRpbmVzLmNoYW5uZWxzLkNoYW5uZWwKaW1wb3J0IGtvdGxpbnguY29yb3V0aW5lcy5kZWxheQppbXBvcnQga290bGlueC5jb3JvdXRpbmVzLmZsb3cuTXV0YWJsZVN0YXRlRmxvdwppbXBvcnQga290bGlueC5jb3JvdXRpbmVzLnJ1bkJsb2NraW5nCmltcG9ydCBvcmcuanVuaXQuQXNzZXJ0LmFzc2VydEVxdWFscwppbXBvcnQgb3JnLmp1bml0LkFzc2VydC5mYWlsCmltcG9ydCBvcmcuanVuaXQuVGVzdAoKY2xhc3MgU3RhcnR1cFJlYWRpbmVzc1JlZ3Jlc3Npb25UZXN0IHsKICAgIHByaXZhdGUgY2xhc3MgRnJhbWVzIDogRnJhbWVTb3VyY2UgewogICAgICAgIHByaXZhdGUgdmFsIGNoYW5uZWwgPSBDaGFubmVsPENhcHR1cmVkRnJhbWU+KENoYW5uZWwuVU5MSU1JVEVEKQogICAgICAgIG92ZXJyaWRlIHZhbCBmcmFtZXMgPSBjaGFubmVsCiAgICAgICAgb3ZlcnJpZGUgc3VzcGVuZCBmdW4gc3RhcnQoZ3JhbnQ6IFByb2plY3Rpb25HcmFudCkgPSBVbml0CiAgICAgICAgb3ZlcnJpZGUgc3VzcGVuZCBmdW4gc3RvcCgpIHsgY2hhbm5lbC5jbG9zZSgpIH0KICAgIH0KCiAgICBwcml2YXRlIGNsYXNzIEVuZ2luZSA6IEluZmVyZW5jZUVuZ2luZSB7CiAgICAgICAgb3ZlcnJpZGUgZnVuIGluaXRpYWxpemUoY29uZmlnOiBCb3RDb25maWcpID0gSW5mZXJlbmNlUHJvdmlkZXIuQ1BVCiAgICAgICAgb3ZlcnJpZGUgZnVuIGluZmVyKGZyYW1lOiBDYXB0dXJlZEZyYW1lKSA9IFZpc2lvbkZyYW1lUmVzdWx0KGVtcHR5TGlzdCgpLCBJbmZlcmVuY2VQcm92aWRlci5DUFUsIDApCiAgICAgICAgb3ZlcnJpZGUgZnVuIHByb3ZpZGVyKCkgPSBJbmZlcmVuY2VQcm92aWRlci5DUFUKICAgICAgICBvdmVycmlkZSBmdW4gY2xvc2UoKSA9IFVuaXQKICAgIH0KCiAgICBwcml2YXRlIGNsYXNzIElucHV0IDogSW5wdXRDb250cm9sbGVyIHsKICAgICAgICBvdmVycmlkZSB2YWwgc3RhdHVzID0gTXV0YWJsZVN0YXRlRmxvdyhJbnB1dFN0YXR1cy5SRUFEWSkKICAgICAgICBvdmVycmlkZSB2YWwgZm9yZWdyb3VuZFBhY2thZ2UgPSBNdXRhYmxlU3RhdGVGbG93PFN0cmluZz8+KCJkZXYucHlsYXJsLmFuZHJvaWQiKQogICAgICAgIG92ZXJyaWRlIHN1c3BlbmQgZnVuIGRpc3BhdGNoKGFjdGlvbjogQm90QWN0aW9uLCBnZW9tZXRyeTogRGlzcGxheUdlb21ldHJ5KSA9IFJlc3VsdC5zdWNjZXNzKFVuaXQpCiAgICAgICAgb3ZlcnJpZGUgc3VzcGVuZCBmdW4gcmVsZWFzZUFsbCgpID0gVW5pdAogICAgfQoKICAgIHByaXZhdGUgc3VzcGVuZCBmdW4gYXdhaXRQaGFzZShjb29yZGluYXRvcjogQm90UnVudGltZUNvb3JkaW5hdG9yLCBwaGFzZTogUnVudGltZVBoYXNlKSB7CiAgICAgICAgcmVwZWF0KDIwMCkgewogICAgICAgICAgICBpZiAoY29vcmRpbmF0b3Iuc25hcHNob3QudmFsdWUucGhhc2UgPT0gcGhhc2UpIHJldHVybgogICAgICAgICAgICBkZWxheSg1KQogICAgICAgIH0KICAgICAgICBmYWlsKCJwaGFzZT0ke2Nvb3JkaW5hdG9yLnNuYXBzaG90LnZhbHVlLnBoYXNlfSwgZXhwZWN0ZWQ9JHBoYXNlIikKICAgIH0KCiAgICBAVGVzdCBmdW4gc3RhcnR1cF93YWl0c19pbl9jYXB0dXJpbmdfdGhlbl9ydW5zX3doZW5fYnJhd2xfc3RhcnNfYmVjb21lc19mb3JlZ3JvdW5kKCkgPSBydW5CbG9ja2luZyB7CiAgICAgICAgdmFsIGlucHV0ID0gSW5wdXQoKQogICAgICAgIHZhbCBjb29yZGluYXRvciA9IEJvdFJ1bnRpbWVDb29yZGluYXRvcigKICAgICAgICAgICAgZnJhbWVTb3VyY2UgPSBGcmFtZXMoKSwKICAgICAgICAgICAgaW5mZXJlbmNlRW5naW5lID0gRW5naW5lKCksCiAgICAgICAgICAgIGlucHV0Q29udHJvbGxlciA9IGlucHV0LAogICAgICAgICAgICBnZW9tZXRyeVByb3ZpZGVyID0geyBEaXNwbGF5R2VvbWV0cnkoMjQwMCwgMTA4MCwgMCkgfSwKICAgICAgICApCgogICAgICAgIGNvb3JkaW5hdG9yLnN0YXJ0KEJvdENvbmZpZygpLCBQcm9qZWN0aW9uR3JhbnQoMCwgbnVsbCkpCiAgICAgICAgYXNzZXJ0RXF1YWxzKFJ1bnRpbWVQaGFzZS5DQVBUVVJJTkcsIGNvb3JkaW5hdG9yLnNuYXBzaG90LnZhbHVlLnBoYXNlKQoKICAgICAgICBpbnB1dC5mb3JlZ3JvdW5kUGFja2FnZS52YWx1ZSA9IFBsYXRmb3JtQ29udHJhY3QuQlJBV0xfU1RBUlNfUEFDS0FHRQogICAgICAgIGF3YWl0UGhhc2UoY29vcmRpbmF0b3IsIFJ1bnRpbWVQaGFzZS5SVU5OSU5HKQogICAgICAgIGNvb3JkaW5hdG9yLnN0b3AoKQogICAgfQp9Cg==' | base64 -d > project/runtime/src/test/kotlin/dev/pylarl/runtime/StartupReadinessRegressionTest.kt
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Run startup regression test
+        working-directory: project
+        run: gradle :runtime:testDebugUnitTest --tests dev.pylarl.runtime.StartupReadinessRegressionTest --stacktrace --no-daemon
