@@ -1,0 +1,74 @@
+name: Build Pyla-RL Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'payload/**'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          cat payload/part*.b64 | base64 --decode > /tmp/pyla-project.tar.gz
+          echo 'd2bd56fd1ce4486ae249ed1dc9b24279feb124ddbdb87dee947441f32807c2ca  /tmp/pyla-project.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/pyla-project.tar.gz -C .
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 37
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-37' 'build-tools;36.0.0' 'platform-tools'
+
+      - name: Set up Gradle 9.6.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          gradle clean testDebugUnitTest lintDebug assembleDebug --stacktrace
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pyla-RL-Android-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pyla-RL-Android-build-reports
+          path: |
+            **/build/reports/**
+          if-no-files-found: ignore
+          retention-days: 7
