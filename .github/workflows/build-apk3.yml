@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v6 vision-execution
+name: Build Pyla Android APK v7 respawn-recovery
 
 on:
   workflow_dispatch:
@@ -52,10 +52,10 @@ jobs:
           python3 patches/fix-performance-resume.py
           python3 patches/fix-never-pause-on-foreground.py
           python3 patches/fix-vision-letterbox.py
-          grep -q 'return inputController.status.value == InputStatus.READY && geometry.isLandscape' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
-          grep -q 'val scale = min(inputWidth.toFloat() / frame.width' project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt
-          grep -q 'src.get(pixel + 2)' project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt
-          grep -q 'val scaleX = frame.width.toFloat() / resizedWidth' project/vision/src/main/kotlin/dev/pylarl/vision/model/OrtInferenceSessionFactory.kt
+          python3 patches/fix-respawn-recovery.py
+          grep -q 'respawnGraceNanos = 8_000_000_000L' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
+          grep -q 'gameplayDecisionEngine = GameplayDecisionEngine()' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
+          grep -q 'withinRespawnGrace' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
 
       - uses: actions/setup-java@v5
         with:
@@ -73,9 +73,9 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Run vision regression tests
+      - name: Run runtime regression tests
         working-directory: project
-        run: gradle :vision:testDebugUnitTest --stacktrace --no-daemon
+        run: gradle :runtime:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build debug APK
         working-directory: project
@@ -85,7 +85,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-vision-execution-fixed-apk
+          name: pyla-rl-android-respawn-recovery-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
