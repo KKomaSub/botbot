@@ -30,7 +30,23 @@ jobs:
             sed -i '2i import java.net.URI' "$f"
             sed -i 's/java\.net\.URI(/URI(/g' "$f"
           done
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('project/vision/build.gradle.kts')
+          s = p.read_text()
+          s = s.replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")')
+          s = s.replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
+          p.write_text(s)
+          p = Path('project/state/build.gradle.kts')
+          s = p.read_text()
+          s = s.replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")')
+          s = s.replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")')
+          s = s.replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '')
+          s = s.replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
+          p.write_text(s)
+          PY
           ! grep -R "compileSdk = 37" project --include='build.gradle.kts'
+          ! grep -R "android.sourceSets" project --include='build.gradle.kts'
 
       - uses: actions/setup-java@v5
         with:
