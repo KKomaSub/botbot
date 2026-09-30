@@ -47,6 +47,7 @@ jobs:
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
           python3 patches/fix-performance-resume.py
+          python3 patches/fix-never-pause-on-foreground.py
       - name: Add persistent foreground mismatch regression test
         shell: bash
         run: |
