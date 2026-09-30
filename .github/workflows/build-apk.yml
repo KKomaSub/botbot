@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Android project
+      - name: Restore and normalize Android project
         shell: bash
         run: |
           cat payload/part*.b64 | base64 --decode > /tmp/pyla-project.tar.gz
@@ -28,6 +28,10 @@ jobs:
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
           find . -name build.gradle.kts -type f -print0 | xargs -0 sed -i 's/compileSdk = 37/compileSdk = 36/g'
+          sed -i 's/agp = "9.4.0"/agp = "8.13.2"/' gradle/libs.versions.toml
+          sed -i 's/kotlin = "2.4.20"/kotlin = "2.3.21"/' gradle/libs.versions.toml
+          sed -i '/android.builtInKotlin=false/d;/android.newDsl=false/d' gradle.properties
+          grep -E '^(agp|kotlin) =' gradle/libs.versions.toml
           grep -R 'compileSdk = ' -n app bot-core capture input runtime state vision
 
       - name: Set up JDK 17
@@ -44,10 +48,10 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
 
-      - name: Set up Gradle 9.6.0
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.6.0'
+          gradle-version: '8.13'
 
       - name: Build debug APK
         shell: bash
