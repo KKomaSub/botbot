@@ -26,6 +26,10 @@ jobs:
           test -f project/app/build.gradle.kts
           find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
           find project -name build.gradle.kts -exec sed -i '1i @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")' {} +
+          for f in project/state/build.gradle.kts project/vision/build.gradle.kts; do
+            sed -i '2i import java.net.URI' "$f"
+            sed -i 's/java\.net\.URI(/URI(/g' "$f"
+          done
           ! grep -R "compileSdk = 37" project --include='build.gradle.kts'
 
       - uses: actions/setup-java@v5
