@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v5 no-pause
+name: Build Pyla Android APK v6 vision-execution
 
 on:
   workflow_dispatch:
@@ -51,8 +51,11 @@ jobs:
           python3 patches/fix-startup-readiness.py
           python3 patches/fix-performance-resume.py
           python3 patches/fix-never-pause-on-foreground.py
+          python3 patches/fix-vision-letterbox.py
           grep -q 'return inputController.status.value == InputStatus.READY && geometry.isLandscape' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
-          ! grep -A5 'private fun isReadyForRunning' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt | grep -q 'foregroundPackage.value == PlatformContract.BRAWL_STARS_PACKAGE'
+          grep -q 'val scale = min(inputWidth.toFloat() / frame.width' project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt
+          grep -q 'src.get(pixel + 2)' project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt
+          grep -q 'val scaleX = frame.width.toFloat() / resizedWidth' project/vision/src/main/kotlin/dev/pylarl/vision/model/OrtInferenceSessionFactory.kt
 
       - uses: actions/setup-java@v5
         with:
@@ -70,6 +73,10 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Run vision regression tests
+        working-directory: project
+        run: gradle :vision:testDebugUnitTest --stacktrace --no-daemon
+
       - name: Build debug APK
         working-directory: project
         run: |
@@ -78,7 +85,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-no-pause-fixed-apk
+          name: pyla-rl-android-vision-execution-fixed-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
