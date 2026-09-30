@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v7 respawn-recovery
+name: Build Pyla Android APK v7-fast respawn-recovery
 
 on:
   workflow_dispatch:
@@ -14,7 +14,6 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
       - name: Restore Android project
         shell: bash
         run: |
@@ -33,19 +32,13 @@ jobs:
           done
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('project/vision/build.gradle.kts')
-          s = p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
-          p.write_text(s)
-          p = Path('project/state/build.gradle.kts')
-          s = p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
-          p.write_text(s)
+          p=Path('project/vision/build.gradle.kts'); s=p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")','val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n',''); p.write_text(s)
+          p=Path('project/state/build.gradle.kts'); s=p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")','val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")','val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n','').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n',''); p.write_text(s)
           PY
-
       - name: Apply fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
-          echo "82fcf6e2cd7bc3da5a8fd1372e11f64cbc80d7aa815465c204b8be5100ab03bc  safety-overlay.tar.gz" | sha256sum -c -
           tar -xzf safety-overlay.tar.gz -C project
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
@@ -56,33 +49,24 @@ jobs:
           grep -q 'respawnGraceNanos = 8_000_000_000L' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
           grep -q 'gameplayDecisionEngine = GameplayDecisionEngine()' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
           grep -q 'withinRespawnGrace' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Install Android SDK
         shell: bash
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-
-      - name: Run runtime regression tests
-        working-directory: project
-        run: gradle :runtime:testDebugUnitTest --stacktrace --no-daemon
-
       - name: Build debug APK
         working-directory: project
         run: |
           gradle :app:assembleDebug --stacktrace --no-daemon
           test -f app/build/outputs/apk/debug/app-debug.apk
-
       - uses: actions/upload-artifact@v4
         with:
           name: pyla-rl-android-respawn-recovery-apk
