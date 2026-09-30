@@ -1,0 +1,87 @@
+name: Build Pyla Android APK v3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "build/apk2" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Android project
+        shell: bash
+        run: |
+          cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
+          base64 -d project.b64 > pyla-project.tar.gz
+          mkdir project
+          tar -xzf pyla-project.tar.gz -C project
+          find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
+          sed -i 's/composeBom = "2026.09.00"/composeBom = "2025.08.00"/' project/gradle/libs.versions.toml
+          sed -i 's/activity = "1.13.0"/activity = "1.11.0"/' project/gradle/libs.versions.toml
+          sed -i 's/lifecycle = "2.11.0"/lifecycle = "2.9.4"/' project/gradle/libs.versions.toml
+          find project -name build.gradle.kts -exec sed -i '1i @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")' {} +
+          for f in project/state/build.gradle.kts project/vision/build.gradle.kts; do
+            sed -i '2i import java.net.URI' "$f"
+            sed -i 's/java\.net\.URI(/URI(/g' "$f"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('project/vision/build.gradle.kts')
+          s = p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")', 'val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n', '')
+          p.write_text(s)
+          p = Path('project/state/build.gradle.kts')
+          s = p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")', 'val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")', 'val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n', '').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n', '')
+          p.write_text(s)
+          PY
+
+      - name: Apply runtime fixes
+        shell: bash
+        run: |
+          base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
+          echo "82fcf6e2cd7bc3da5a8fd1372e11f64cbc80d7aa815465c204b8be5100ab03bc  safety-overlay.tar.gz" | sha256sum -c -
+          tar -xzf safety-overlay.tar.gz -C project
+          sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          python3 patches/fix-startup-readiness.py
+          grep -q 'RuntimePhase.CAPTURING' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
+          grep -q 'PERFORMANCE_DEGRADED' project/runtime/src/main/kotlin/dev/pylarl/runtime/RuntimeError.kt
+          grep -q 'forceStopPackageBestEffort' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Run runtime regression tests
+        working-directory: project
+        run: gradle :runtime:testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Build debug APK
+        working-directory: project
+        run: |
+          gradle :app:assembleDebug --stacktrace --no-daemon
+          test -f app/build/outputs/apk/debug/app-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyla-rl-android-startup-fixed-apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
