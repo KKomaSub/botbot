@@ -47,6 +47,7 @@ jobs:
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           echo "82fcf6e2cd7bc3da5a8fd1372e11f64cbc80d7aa815465c204b8be5100ab03bc  safety-overlay.tar.gz" | sha256sum -c -
           tar -xzf safety-overlay.tar.gz -C project
+          sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'PERFORMANCE_DEGRADED' project/runtime/src/main/kotlin/dev/pylarl/runtime/RuntimeError.kt
           grep -q 'resumeRequested' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt
           grep -q 'forceStopPackageBestEffort' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
