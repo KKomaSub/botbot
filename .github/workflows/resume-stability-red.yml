@@ -52,15 +52,12 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          matches=list(Path('project/runtime/src/test').rglob('BotRuntimeCoordinatorTest.kt'))
-          if not matches: raise SystemExit('BotRuntimeCoordinatorTest.kt not found')
-          p=matches[0]
+          p=Path('project/runtime/src/test/kotlin/dev/pylarl/runtime/SafetyRegressionTest.kt')
           s=p.read_text()
-          marker='''    @Test fun repeated_stop_is_idempotent_and_closes_each_dependency_once() = runBlocking {'''
-          test='''    @Test fun brief_foreground_noise_does_not_pause_running() = runBlocking {\n        val input = Input(); val coordinator = coordinator(input = input)\n        coordinator.start(BotConfig(), ProjectionGrant(0, null)); awaitPhase(coordinator, RuntimePhase.RUNNING)\n        input.foregroundPackage.value = "com.android.systemui"\n        delay(100)\n        input.foregroundPackage.value = PlatformContract.BRAWL_STARS_PACKAGE\n        delay(700)\n        assertEquals(RuntimePhase.RUNNING, coordinator.snapshot.value.phase)\n        coordinator.stop()\n    }\n\n'''
-          if marker not in s: raise SystemExit('test insertion marker not found')
-          p.write_text(s.replace(marker, test+marker, 1))
-          print(p)
+          test='''\n    @Test fun brief_foreground_noise_does_not_pause_running() = runBlocking {\n        val input = Input()\n        val coordinator = coordinator(input = input)\n        coordinator.start(BotConfig(), ProjectionGrant(0, null))\n        awaitPhase(coordinator, RuntimePhase.RUNNING)\n        input.foregroundPackage.value = "com.android.systemui"\n        delay(100)\n        input.foregroundPackage.value = PlatformContract.BRAWL_STARS_PACKAGE\n        delay(700)\n        assertEquals(RuntimePhase.RUNNING, coordinator.snapshot.value.phase)\n        coordinator.stop()\n    }\n'''
+          idx=s.rfind('\n}')
+          if idx < 0: raise SystemExit('class closing brace not found')
+          p.write_text(s[:idx]+test+s[idx:])
           PY
       - uses: actions/setup-java@v5
         with:
@@ -77,4 +74,4 @@ jobs:
           gradle-version: "9.6.0"
       - name: Run resume stability regression test
         working-directory: project
-        run: gradle :runtime:testDebugUnitTest --tests 'dev.pylarl.runtime.BotRuntimeCoordinatorTest.brief_foreground_noise_does_not_pause_running' --stacktrace --no-daemon
+        run: gradle :runtime:testDebugUnitTest --tests 'dev.pylarl.runtime.SafetyRegressionTest.brief_foreground_noise_does_not_pause_running' --stacktrace --no-daemon
