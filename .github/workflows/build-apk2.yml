@@ -24,6 +24,8 @@ jobs:
           tar -xzf pyla-project.tar.gz -C project
           test -f project/settings.gradle.kts
           test -f project/app/build.gradle.kts
+          find project -name build.gradle.kts -exec sed -i 's/compileSdk = 37/compileSdk = 36/g' {} +
+          ! grep -R "compileSdk = 37" project --include='build.gradle.kts'
 
       - uses: actions/setup-java@v5
         with:
@@ -37,7 +39,7 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platforms;android-37" "build-tools;36.0.0" "platform-tools"
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
