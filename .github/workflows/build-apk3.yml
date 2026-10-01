@@ -53,6 +53,7 @@ jobs:
           python3 patches/fix-combat-input-v3.py
           python3 patches/fix-world-coordinate-combat-v4.py
           python3 patches/fix-world-tracker-jump.py
+          python3 patches/test-attack-regression-v5.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'MOVE_SEGMENT_MS = 280L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'MOVE_HOLD_GRACE_MS = 1_650L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
