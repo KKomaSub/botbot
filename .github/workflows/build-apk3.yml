@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v12 combat-input-v3
+name: Build Pyla Android APK v13 world-combat-v4
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
           p=Path('project/vision/build.gradle.kts'); s=p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")','val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n',''); p.write_text(s)
           p=Path('project/state/build.gradle.kts'); s=p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")','val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")','val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n','').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n',''); p.write_text(s)
           PY
-      - name: Apply runtime, UI and combat/input v3 fixes
+      - name: Apply runtime, UI and world-combat v4 fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
@@ -51,11 +51,13 @@ jobs:
           python3 patches/fix-ui-identifiers.py
           python3 patches/fix-continuous-queue-syntax.py
           python3 patches/fix-combat-input-v3.py
+          python3 patches/fix-world-coordinate-combat-v4.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'MOVE_SEGMENT_MS = 280L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'MOVE_HOLD_GRACE_MS = 1_650L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
-          grep -q 'lockedTargetRelative' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
-          grep -q 'relativeTarget' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          grep -q 'WORLD_PER_CANONICAL_PX = 75f / 16f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
+          grep -q 'DIRECTIONS = 48' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
+          grep -q 'private fun ground' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
           ! grep -q 'MoveVector(0f,35f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
           grep -q 'selectedBrawler' project/app/src/main/java/dev/pylarl/android/settings/UserSettings.kt
           grep -q 'Farm Plan' project/app/src/main/java/dev/pylarl/android/ui/PylaHubScreens.kt
@@ -82,7 +84,7 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-combat-input-v3-apk
+          name: pyla-rl-android-world-combat-v4-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
