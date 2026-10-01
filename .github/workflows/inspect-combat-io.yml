@@ -31,18 +31,16 @@ jobs:
           python3 patches/feature-original-ui-combat-v2.py
           python3 patches/fix-ui-identifiers.py
           python3 patches/fix-continuous-queue-syntax.py
-      - name: Print input and coordinate pipeline
+      - name: Print exact input pipeline
         shell: bash
         run: |
-          echo '=== INPUT FILES ==='
-          find project/input/src/main -type f \( -name '*.kt' -o -name '*.java' \) -print
-          echo '=== ACTION MAPPING REFERENCES ==='
-          grep -R -n -E 'AttackVector|MoveVector|angleDegrees|pointerId|CANONICAL|attack|move|cos\(|sin\(' project/input/src/main project/bot-core/src/main/kotlin | head -400 || true
-          echo '=== GESTURE QUEUE ==='
-          cat project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
-          echo '=== ACCESSIBILITY SERVICE ==='
-          cat project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
-          echo '=== GESTURE PLANS ==='
-          grep -R -n -A120 -B20 'sealed.*GesturePlan\|class GesturePlan\|data class Stroke' project/input/src/main || true
-          echo '=== VECTOR2 ==='
-          grep -R -n -A100 -B20 'data class Vector2\|fun angleDegrees' project/bot-core/src/main/kotlin || true
+          echo '=== GESTURE PLAN COMPILER ==='
+          cat project/input/src/main/kotlin/dev/pylarl/input/GesturePlanCompiler.kt
+          echo '=== COORDINATE MAPPER ==='
+          cat project/input/src/main/kotlin/dev/pylarl/input/CoordinateMapper.kt
+          echo '=== INPUT CONTROLLER ==='
+          cat project/input/src/main/java/dev/pylarl/input/AccessibilityInputController.kt
+          echo '=== PLATFORM CONTRACT ==='
+          cat project/bot-core/src/main/kotlin/dev/pylarl/botcore/PlatformContract.kt
+          echo '=== RUNTIME OBSERVATION BUILD ==='
+          grep -n -A90 -B25 'fun VisionDetection.box\|BotObservation(' project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt || true
