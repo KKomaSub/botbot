@@ -1,0 +1,11 @@
+from pathlib import Path
+p=Path('project/app/src/main/java/dev/pylarl/android/ui/PylaApp.kt')
+s=p.read_text()
+s=s.replace('private val Surface=Color(', 'private val PylaSurface=Color(')
+s=s.replace('private val Text=Color(', 'private val PylaText=Color(')
+s=s.replace('surface=Surface,', 'surface=PylaSurface,')
+s=s.replace('onBackground=Text,onSurface=Text', 'onBackground=PylaText,onSurface=PylaText')
+s=s.replace('contentColor=Text,', 'contentColor=PylaText,')
+s=s.replace('else Text)', 'else PylaText)')
+p.write_text(s)
+print('ui identifier collision fix applied')
