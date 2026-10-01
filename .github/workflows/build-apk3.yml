@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v14 combat-movement-v5
+name: Build Pyla Android APK v15 navigation-team-v6
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
           p=Path('project/vision/build.gradle.kts'); s=p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")','val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n',''); p.write_text(s)
           p=Path('project/state/build.gradle.kts'); s=p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")','val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")','val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n','').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n',''); p.write_text(s)
           PY
-      - name: Apply runtime, UI and combat-movement v5 fixes
+      - name: Apply runtime, UI and navigation-team v6 fixes
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
@@ -55,15 +55,21 @@ jobs:
           python3 patches/fix-world-tracker-jump.py
           python3 patches/test-attack-regression-v5.py
           python3 patches/fix-attack-exploration-wall-v5.py
+          python3 patches/test-navigation-team-v6.py
+          python3 patches/fix-navigation-team-v6.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'MOVE_SEGMENT_MS = 280L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'MOVE_HOLD_GRACE_MS = 1_650L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'WORLD_PER_CANONICAL_PX = 75f / 16f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
           grep -q 'DIRECTIONS = 48' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
-          grep -q 'chooseExplorationMovement' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
-          grep -q 'nearestWallDistance' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          grep -q 'FriendlyFireGuard' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          grep -q 'confirmedEnemy' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/FriendlyFireGuard.kt
+          grep -q 'shotLaneClear' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/FriendlyFireGuard.kt
+          grep -q 'chooseRoamMovement' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          grep -q 'pathBlocked' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
           grep -q 'plausibleTravel' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/EnemyTracker.kt
-          ! grep -q 'MoveVector(0f,35f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          ! grep -q 'wallEscape.update' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          ! grep -q 'exploreTurnAt' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
           grep -q 'selectedBrawler' project/app/src/main/java/dev/pylarl/android/settings/UserSettings.kt
           grep -q 'Farm Plan' project/app/src/main/java/dev/pylarl/android/ui/PylaHubScreens.kt
       - uses: actions/setup-java@v5
@@ -79,7 +85,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
-      - name: Combat regression tests
+      - name: Combat and navigation regression tests
         working-directory: project
         run: gradle :bot-core:testDebugUnitTest --stacktrace --no-daemon
       - name: Build debug APK
@@ -89,7 +95,7 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-combat-movement-v5-apk
+          name: pyla-rl-android-navigation-team-v6-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
