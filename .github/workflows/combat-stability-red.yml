@@ -1,4 +1,4 @@
-name: Combat stability regression RED
+name: Combat stability regression
 
 on:
   workflow_dispatch:
@@ -9,11 +9,11 @@ permissions:
   contents: read
 
 jobs:
-  red:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore current project
+      - name: Restore fixed project
         shell: bash
         run: |
           cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
@@ -49,52 +49,22 @@ jobs:
           python3 patches/feature-original-ui-combat-v2.py
           python3 patches/fix-ui-identifiers.py
           python3 patches/fix-continuous-queue-syntax.py
-      - name: Inject regressions
-        shell: bash
-        run: |
-          cat > project/bot-core/src/test/kotlin/dev/pylarl/botcore/decision/CombatStabilityRegressionTest.kt <<'EOF'
-          package dev.pylarl.botcore.decision
-
-          import dev.pylarl.botcore.action.MoveVector
-          import dev.pylarl.botcore.config.BotConfig
-          import dev.pylarl.botcore.vision.BotObservation
-          import dev.pylarl.botcore.vision.EntityBox
-          import dev.pylarl.botcore.vision.Vector2
-          import org.junit.Assert.assertTrue
-          import org.junit.Test
-
-          class CombatStabilityRegressionTest {
-              private val player = EntityBox(0f, 0f, 100f, 100f)
-
-              @Test fun detection_dropout_does_not_force_right_movement() {
-                  val observation = BotObservation(
-                      1_000_000_000L, player, emptyList(), emptyList(), emptyList(), emptyList(),
-                      null, false, false, false, "shelly"
-                  )
-                  val actions = GameplayDecisionEngine().decide(observation, BotConfig(alwaysMove = true))
-                  val moves = actions.filterIsInstance<MoveVector>()
-                  assertTrue("no target must not inject a hard-coded 0-degree/right move", moves.none { kotlin.math.abs(it.angleDegrees) < 0.01f })
-              }
-
-              @Test fun target_switch_like_jump_does_not_create_extreme_velocity() {
-                  val tracker = EnemyTracker()
-                  tracker.update(Vector2(300f, 100f), 1_000_000_000L)
-                  tracker.update(Vector2(300f, 130f), 1_100_000_000L)
-                  val velocity = tracker.update(Vector2(125f, 285f), 1_200_000_000L)
-                  assertTrue("association jump must be rejected/reset instead of poisoning predictive aim: $velocity", velocity.length() < 500f)
-              }
-          }
-          EOF
-      - name: RED continuous movement structure
-        id: input_red
-        continue-on-error: true
+          python3 patches/fix-combat-input-v3.py
+      - name: Verify continuous movement structure
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           q = Path('project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt').read_text()
-          assert 'durationMs = 140L' not in q, 'movement is still chopped into 140ms gesture segments'
-          assert '<= 520L' not in q, 'movement hold expires after only 520ms'
+          assert 'durationMs = 140L' not in q
+          assert '<= 520L' not in q
+          assert 'MOVE_SEGMENT_MS = 280L' in q
+          assert 'MOVE_HOLD_GRACE_MS = 1_650L' in q
+          e = Path('project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt').read_text()
+          assert 'MoveVector(0f,35f' not in e.replace(' ', '')
+          assert 'relativeTarget' in e
+          assert 'lockedTargetRelative' in e
+          print('input/target structural regressions GREEN')
           PY
       - uses: actions/setup-java@v5
         with:
@@ -109,17 +79,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.6.0'
-      - name: RED bot-core regressions
-        id: combat_red
-        continue-on-error: true
+      - name: GREEN combat regressions
         working-directory: project
         run: gradle :bot-core:testDebugUnitTest --tests '*CombatStabilityRegressionTest*' --stacktrace --no-daemon
-      - name: Confirm both current regressions are RED
-        if: always()
-        shell: bash
-        run: |
-          echo "input outcome=${{ steps.input_red.outcome }}"
-          echo "combat outcome=${{ steps.combat_red.outcome }}"
-          test "${{ steps.input_red.outcome }}" = "failure"
-          test "${{ steps.combat_red.outcome }}" = "failure"
-          echo 'Both current regressions reproduced.'
