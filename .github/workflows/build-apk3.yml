@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v8 smooth-movement
+name: Build Pyla Android APK v9 original-ui-combat-v2
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
           p=Path('project/vision/build.gradle.kts'); s=p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")','val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n',''); p.write_text(s)
           p=Path('project/state/build.gradle.kts'); s=p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")','val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")','val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n','').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n',''); p.write_text(s)
           PY
-      - name: Apply fixes
+      - name: Apply fixes and combat v2
         shell: bash
         run: |
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
@@ -47,8 +47,11 @@ jobs:
           python3 patches/fix-vision-letterbox.py
           python3 patches/fix-respawn-recovery.py
           python3 patches/fix-smooth-movement.py
-          grep -q 'latestMove = plan.copy(durationMs = maxOf(plan.durationMs, 320L))' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
-          grep -q 'GestureDispatchQueue.offer(plan)' project/input/src/main/java/dev/pylarl/input/AccessibilityInputController.kt
+          python3 patches/feature-original-ui-combat-v2.py
+          grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          grep -q 'predictIntercept' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/EnemyTracker.kt
+          grep -q 'selectedBrawler' project/app/src/main/java/dev/pylarl/android/settings/UserSettings.kt
+          grep -q 'Farm Plan' project/app/src/main/java/dev/pylarl/android/ui/PylaHubScreens.kt
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -62,6 +65,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
+      - name: Combat regression tests
+        working-directory: project
+        run: gradle :bot-core:testDebugUnitTest --stacktrace --no-daemon
       - name: Build debug APK
         working-directory: project
         run: |
@@ -69,7 +75,7 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: pyla-rl-android-smooth-movement-apk
+          name: pyla-rl-android-original-ui-combat-v2-apk
           path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
