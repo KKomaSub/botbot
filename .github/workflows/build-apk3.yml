@@ -1,4 +1,4 @@
-name: Build Pyla Android APK v9 original-ui-combat-v2
+name: Build Pyla Android APK v10 original-ui-combat-v2
 
 on:
   workflow_dispatch:
@@ -48,10 +48,12 @@ jobs:
           python3 patches/fix-respawn-recovery.py
           python3 patches/fix-smooth-movement.py
           python3 patches/feature-original-ui-combat-v2.py
+          python3 patches/fix-ui-identifiers.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'predictIntercept' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/EnemyTracker.kt
           grep -q 'selectedBrawler' project/app/src/main/java/dev/pylarl/android/settings/UserSettings.kt
           grep -q 'Farm Plan' project/app/src/main/java/dev/pylarl/android/ui/PylaHubScreens.kt
+          grep -q 'PylaText' project/app/src/main/java/dev/pylarl/android/ui/PylaApp.kt
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
