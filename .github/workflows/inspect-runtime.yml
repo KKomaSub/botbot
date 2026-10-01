@@ -1,4 +1,4 @@
-name: Inspect runtime startup logic
+name: Inspect combat wall logic
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore and inspect
+      - name: Restore and inspect combat movement
         shell: bash
         run: |
           cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
@@ -22,14 +22,20 @@ jobs:
           tar -xzf pyla-project.tar.gz -C project
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           tar -xzf safety-overlay.tar.gz -C project
+          sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           python3 patches/fix-startup-readiness.py
-          echo '===== BotRuntimeCoordinator.kt ====='
-          nl -ba project/runtime/src/main/kotlin/dev/pylarl/runtime/BotRuntimeCoordinator.kt | sed -n '1,360p'
-          echo '===== OnnxInferenceEngine.kt ====='
-          nl -ba project/vision/src/main/kotlin/dev/pylarl/vision/OnnxInferenceEngine.kt | sed -n '1,360p'
-          echo '===== TensorPreprocessor.kt ====='
-          nl -ba project/vision/src/main/kotlin/dev/pylarl/vision/TensorPreprocessor.kt | sed -n '1,320p'
-          echo '===== MediaProjectionFrameSource.kt ====='
-          nl -ba project/capture/src/main/java/dev/pylarl/capture/MediaProjectionFrameSource.kt | sed -n '1,360p'
-          echo '===== PylaAccessibilityService.kt ====='
-          nl -ba project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt | sed -n '1,360p'
+          python3 patches/fix-performance-resume.py
+          python3 patches/fix-never-pause-on-foreground.py
+          python3 patches/fix-vision-letterbox.py
+          python3 patches/fix-respawn-recovery.py
+          python3 patches/fix-smooth-movement.py
+          python3 patches/feature-original-ui-combat-v2.py
+          python3 patches/fix-ui-identifiers.py
+          python3 patches/fix-continuous-queue-syntax.py
+          python3 patches/fix-combat-input-v3.py
+          python3 patches/fix-world-coordinate-combat-v4.py
+          python3 patches/fix-world-tracker-jump.py
+          echo '===== WallEscape.kt ====='
+          nl -ba project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/WallEscape.kt | sed -n '1,320p'
+          echo '===== GameplayDecisionEngine.kt ====='
+          nl -ba project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt | sed -n '1,360p'
