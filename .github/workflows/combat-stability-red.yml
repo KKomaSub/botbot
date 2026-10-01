@@ -2,6 +2,8 @@ name: Combat stability regression RED
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "build/apk2" ]
 
 permissions:
   contents: read
