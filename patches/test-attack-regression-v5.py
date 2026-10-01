@@ -13,19 +13,21 @@ import org.junit.Test
 import kotlin.math.cos
 
 class AttackRegressionV5Test {
-    @Test fun shellyFiresInsideNominalWeaponRange() {
+    @Test fun shellyFiresInsideNominalWeaponRangeAfterEnemyConfirmation() {
         val player = EntityBox(0f, 0f, 100f, 100f, 1f)
         val enemy = EntityBox(450f, 0f, 550f, 100f, 1f)
-        val observation = BotObservation(
-            1_000_000_000L, player, listOf(enemy), emptyList(), emptyList(), emptyList(),
-            null, false, false, false, "shelly",
+        val engine = GameplayDecisionEngine()
+        val config = BotConfig(selectedBrawler = "shelly", attackMinIntervalSeconds = .01f)
+        engine.decide(
+            BotObservation(1_000_000_000L, player, listOf(enemy), emptyList(), emptyList(), emptyList(), null, false, false, false, "shelly"),
+            config,
         )
-        val actions = GameplayDecisionEngine().decide(
-            observation,
-            BotConfig(selectedBrawler = "shelly", attackMinIntervalSeconds = .01f),
+        val actions = engine.decide(
+            BotObservation(1_100_000_000L, player, listOf(enemy), emptyList(), emptyList(), emptyList(), null, false, false, false, "shelly"),
+            config,
         )
         assertTrue(
-            "an enemy inside Shelly's nominal weapon range must produce an AttackVector: $actions",
+            "a consistently observed enemy inside Shelly's nominal weapon range must produce an AttackVector: $actions",
             actions.any { it is AttackVector },
         )
     }
