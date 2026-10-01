@@ -57,6 +57,7 @@ jobs:
           python3 patches/fix-attack-exploration-wall-v5.py
           python3 patches/test-navigation-team-v6.py
           python3 patches/fix-navigation-team-v6.py
+          python3 patches/fix-v4-test-friendly-confirmation.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'MOVE_SEGMENT_MS = 280L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'MOVE_HOLD_GRACE_MS = 1_650L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
