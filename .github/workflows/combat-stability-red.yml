@@ -24,6 +24,19 @@ jobs:
           sed -i 's/activity = "1.13.0"/activity = "1.11.0"/' project/gradle/libs.versions.toml
           sed -i 's/lifecycle = "2.11.0"/lifecycle = "2.9.4"/' project/gradle/libs.versions.toml
           find project -name build.gradle.kts -exec sed -i '1i @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")' {} +
+          for f in project/state/build.gradle.kts project/vision/build.gradle.kts; do
+            sed -i '2i import java.net.URI' "$f"
+            sed -i 's/java\.net\.URI(/URI(/g' "$f"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('project/vision/build.gradle.kts')
+          s=p.read_text().replace('val modelCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-models/$pylaRevision")','val modelCache = File(projectDir, "src/main/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(modelCache)\n','')
+          p.write_text(s)
+          p=Path('project/state/build.gradle.kts')
+          s=p.read_text().replace('val stateAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/main")','val stateAssetCache = File(projectDir, "src/main/assets")').replace('val stateTestAssetCache = File(gradle.gradleUserHomeDir, "caches/pyla-rl-state-assets/$pylaStateRevision/androidTest")','val stateTestAssetCache = File(projectDir, "src/androidTest/assets")').replace('android.sourceSets.getByName("main").assets.srcDir(stateAssetCache)\n','').replace('android.sourceSets.getByName("androidTest").assets.srcDir(stateTestAssetCache)\n','')
+          p.write_text(s)
+          PY
           base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
           tar -xzf safety-overlay.tar.gz -C project
           sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
@@ -72,6 +85,17 @@ jobs:
               }
           }
           EOF
+      - name: RED continuous movement structure
+        id: input_red
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          q = Path('project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt').read_text()
+          assert 'durationMs = 140L' not in q, 'movement is still chopped into 140ms gesture segments'
+          assert '<= 520L' not in q, 'movement hold expires after only 520ms'
+          PY
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -86,14 +110,16 @@ jobs:
         with:
           gradle-version: '9.6.0'
       - name: RED bot-core regressions
+        id: combat_red
+        continue-on-error: true
         working-directory: project
         run: gradle :bot-core:testDebugUnitTest --tests '*CombatStabilityRegressionTest*' --stacktrace --no-daemon
-      - name: RED continuous movement structure
+      - name: Confirm both current regressions are RED
+        if: always()
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          q = Path('project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt').read_text()
-          assert 'durationMs = 140L' not in q, 'movement is still chopped into 140ms gesture segments'
-          assert '<= 520L' not in q, 'movement hold expires after only 520ms'
-          PY
+          echo "input outcome=${{ steps.input_red.outcome }}"
+          echo "combat outcome=${{ steps.combat_red.outcome }}"
+          test "${{ steps.input_red.outcome }}" = "failure"
+          test "${{ steps.combat_red.outcome }}" = "failure"
+          echo 'Both current regressions reproduced.'
