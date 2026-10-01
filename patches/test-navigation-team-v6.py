@@ -54,8 +54,6 @@ class NavigationTeamV6Test {
     @Test fun wallFartherAheadMustBeDetectedBeforeBotCommitsStraightIntoIt() {
         val engine = GameplayDecisionEngine()
         val player = EntityBox(500f, 450f, 600f, 600f, 1f)
-        // Player ground point is (550,600). A long vertical wall begins ~230 px to the right.
-        // v5 only probes about 55 px, so it commits right when the seeded roam heading is 0 degrees.
         val wall = EntityBox(780f, 250f, 940f, 900f, 1f)
         val move = engine.decide(
             obs(5_400_000_000L, player = player, walls = listOf(wall)),
@@ -64,6 +62,19 @@ class NavigationTeamV6Test {
         val angle = ((move.angleDegrees % 360f) + 360f) % 360f
         val deviationFromRight = min(angle, 360f - angle)
         assertTrue("multi-probe wall avoidance must turn before reaching a wall, angle=$angle", deviationFromRight >= 22.5f)
+    }
+
+    @Test fun cameraCenteredPlayerMustNotBeDeclaredWallStuckFromScreenPositionAlone() {
+        val escape = WallEscape()
+        val walls = listOf(
+            EntityBox(250f, 300f, 350f, 850f),
+            EntityBox(800f, 250f, 900f, 850f),
+            EntityBox(350f, 820f, 800f, 920f),
+        )
+        val config = BotConfig(wallStuckEnabled = true, wallStuckMinWalls = 3, wallStuckTimeoutSeconds = 3f)
+        val first = escape.update(obs(1_000_000_000L, walls = walls), config)
+        val later = escape.update(obs(4_500_000_000L, walls = walls), config)
+        assertTrue("screen-centered camera tracking is not proof the world character is stuck: first=$first later=$later", first == null && later == null)
     }
 }
 ''', encoding='utf-8')
