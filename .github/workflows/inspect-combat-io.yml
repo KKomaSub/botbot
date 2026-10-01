@@ -1,0 +1,48 @@
+name: Inspect combat input pipeline
+
+on:
+  push:
+    branches: [ "build/apk2" ]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore project
+        shell: bash
+        run: |
+          cat payload/part01.b64 payload/part02.b64 payload/part03.b64 payload/part04.b64 payload/part05.b64 payload/part06.b64 payload/part07.b64 payload/part08.b64 payload/part09.b64 payload/part10.b64 payload/part11.b64 payload/part12.b64 payload/part13.b64 payload/part14.b64 > project.b64
+          base64 -d project.b64 > pyla-project.tar.gz
+          mkdir project
+          tar -xzf pyla-project.tar.gz -C project
+          base64 -d patches/safety-overlay.b64 > safety-overlay.tar.gz
+          tar -xzf safety-overlay.tar.gz -C project
+          sed -i 's/@Volatile internal var instance/@Volatile var instance/' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          python3 patches/fix-startup-readiness.py
+          python3 patches/fix-performance-resume.py
+          python3 patches/fix-never-pause-on-foreground.py
+          python3 patches/fix-vision-letterbox.py
+          python3 patches/fix-respawn-recovery.py
+          python3 patches/fix-smooth-movement.py
+          python3 patches/feature-original-ui-combat-v2.py
+          python3 patches/fix-ui-identifiers.py
+          python3 patches/fix-continuous-queue-syntax.py
+      - name: Print input and coordinate pipeline
+        shell: bash
+        run: |
+          echo '=== INPUT FILES ==='
+          find project/input/src/main -type f \( -name '*.kt' -o -name '*.java' \) -print
+          echo '=== ACTION MAPPING REFERENCES ==='
+          grep -R -n -E 'AttackVector|MoveVector|angleDegrees|pointerId|CANONICAL|attack|move|cos\(|sin\(' project/input/src/main project/bot-core/src/main/kotlin | head -400 || true
+          echo '=== GESTURE QUEUE ==='
+          cat project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
+          echo '=== ACCESSIBILITY SERVICE ==='
+          cat project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
+          echo '=== GESTURE PLANS ==='
+          grep -R -n -A120 -B20 'sealed.*GesturePlan\|class GesturePlan\|data class Stroke' project/input/src/main || true
+          echo '=== VECTOR2 ==='
+          grep -R -n -A100 -B20 'data class Vector2\|fun angleDegrees' project/bot-core/src/main/kotlin || true
