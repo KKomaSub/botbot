@@ -52,12 +52,14 @@ jobs:
           python3 patches/fix-continuous-queue-syntax.py
           python3 patches/fix-combat-input-v3.py
           python3 patches/fix-world-coordinate-combat-v4.py
+          python3 patches/fix-world-tracker-jump.py
           grep -q 'executeContinuousMoveWithControl' project/input/src/main/java/dev/pylarl/input/PylaAccessibilityService.kt
           grep -q 'MOVE_SEGMENT_MS = 280L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'MOVE_HOLD_GRACE_MS = 1_650L' project/input/src/main/kotlin/dev/pylarl/input/GestureDispatchQueue.kt
           grep -q 'WORLD_PER_CANONICAL_PX = 75f / 16f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
           grep -q 'DIRECTIONS = 48' project/bot-core/src/main/kotlin/dev/pylarl/botcore/combat/WorldCombatModel.kt
           grep -q 'private fun ground' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
+          grep -q 'plausibleTravel' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/EnemyTracker.kt
           ! grep -q 'MoveVector(0f,35f' project/bot-core/src/main/kotlin/dev/pylarl/botcore/decision/GameplayDecisionEngine.kt
           grep -q 'selectedBrawler' project/app/src/main/java/dev/pylarl/android/settings/UserSettings.kt
           grep -q 'Farm Plan' project/app/src/main/java/dev/pylarl/android/ui/PylaHubScreens.kt
